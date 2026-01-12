@@ -59,7 +59,7 @@ app.post('/create', async (req, res) => {
 
         res.redirect("/login");
     } catch (error) {
-        console.error("❌ Signup Error:", error);
+        console.error("❌ Signup Error:", process.env.NODE_ENV === 'production' ? error.message : error);
         res.redirect("/?error=servererror");
     }
 });
@@ -88,7 +88,7 @@ app.post("/login", async (req, res) => {
         res.cookie("token", token);
         res.redirect("/chatting");
     } catch (error) {
-        console.error("❌ Login Error:", error);
+        console.error("❌ Login Error:", process.env.NODE_ENV === 'production' ? error.message : error);
         res.redirect("/login?error=servererror");
     }
 });
