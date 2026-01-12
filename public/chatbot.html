@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CampusCircle Assistant</title>
+
+    <style>
+        /* ===== Global ===== */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #eef2f5; /* soft campus gray */
+            display: flex;
+            justify-content: center;
+            padding-top: 60px;
+        }
+
+        /* ===== Chat Card ===== */
+        .chat-container {
+            width: 90%;
+            max-width: 600px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            border-top: 5px solid #1f3c88; /* CampusCircle primary */
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            padding: 20px;
+        }
+
+        /* ===== Title ===== */
+        h2 {
+            text-align: center;
+            color: #1f3c88;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e3e8f0;
+            letter-spacing: 0.4px;
+        }
+
+        /* ===== Input Area ===== */
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #msg {
+            flex: 1;
+            padding: 12px;
+            font-size: 15px;
+            border-radius: 6px;
+            border: 1px solid #cfd8e3;
+            background-color: #f9fbfd;
+        }
+
+        #msg:focus {
+            outline: none;
+            border-color: #1f3c88;
+            box-shadow: 0 0 0 2px rgba(31, 60, 136, 0.15);
+        }
+
+        button {
+            padding: 12px 18px;
+            background-color: #1f3c88;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background-color 0.25s ease;
+        }
+
+        button:hover {
+            background-color: #162c63;
+        }
+
+        /* ===== Reply Area ===== */
+        .response-area {
+            background-color: #f4f7fb;
+            border: 1px solid #d9e1ec;
+            border-radius: 6px;
+            padding: 15px;
+            min-height: 60px;
+        }
+
+        .response-area strong {
+            display: block;
+            color: #374151;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        #reply {
+            color: #111827;
+            font-size: 15px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        /* ===== Footer hint ===== */
+        .hint {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <h2>CampusCircle Assistant</h2>
+
+        <div class="input-area">
+            <input id="msg" placeholder="Ask about events, exams, notes..." />
+            <button onclick="send()">Send</button>
+        </div>
+
+        <div class="response-area">
+            <strong>Reply</strong>
+            <div id="reply"></div>
+        </div>
+
+        <div class="hint">
+            Powered by CampusCircle • For college-related queries only
+        </div>
+    </div>
+
+    <script>
+        async function send() {
+            const msgInput = document.getElementById("msg");
+            const replyBox = document.getElementById("reply");
+            const message = msgInput.value.trim();
+
+            if (!message) {
+                replyBox.innerText = "Please type a message first.";
+                return;
+            }
+
+            replyBox.innerText = "Thinking...";
+            msgInput.value = "";
+
+            try {
+                const response = await fetch("http://localhost:3000/chatbot", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Server not responding");
+                }
+
+                const data = await response.json();
+                replyBox.innerText = data.reply;
+
+            } catch (err) {
+                console.error(err);
+                replyBox.innerText =
+                    "Unable to connect to server. Please ensure backend is running.";
+            }
+        }
+    </script>
+
+</body>
+</html>

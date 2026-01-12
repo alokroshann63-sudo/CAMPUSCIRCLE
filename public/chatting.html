@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>College Chat Dashboard</title>
+    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+    <style>
+        /* CSS Variables for easy theme management */
+        :root {
+            --primary: #1f2937;
+            --sidebar-bg: #ffffff;
+            --chat-bg: #f9fafb;
+            --online: #34d399;
+            --typing: #facc15;
+        }
+
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{
+            font-family:system-ui, -apple-system, sans-serif;
+            background:linear-gradient(135deg,#4a5568,#2d3748);
+            height:100vh;
+            overflow:hidden;
+        }
+
+        .dashboard-container{display:flex;height:100vh; position: relative;}
+
+        /* Sidebar */
+        .sidebar{
+            width:280px;
+            background: var(--sidebar-bg);
+            display:flex;
+            flex-direction:column;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .sidebar-header{ padding:20px; border-bottom:1px solid #e5e7eb; }
+
+        .user-profile-card {
+            padding: 15px 20px;
+            background: #f3f4f6;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .profile-info { overflow: hidden; flex-grow: 1; }
+        .profile-name { font-weight: 600; font-size: 14px; color: var(--primary); }
+        
+        .profile-bio-text {
+            font-size: 11px;
+            color: #6b7280;
+            font-style: italic;
+            cursor: pointer;
+            border-bottom: 1px dashed #ccc;
+            display: inline-block;
+        }
+        .bio-edit-input {
+            width: 100%;
+            font-size: 11px;
+            border: 1px solid #4a5568;
+            border-radius: 4px;
+            padding: 2px 5px;
+            outline: none;
+        }
+
+        .chat-buttons { padding:15px; max-height: 40vh; overflow-y: auto; }
+        .chat-btn{
+            width:100%; padding:12px; margin-bottom:8px; border:none; border-radius:10px;
+            background:#f3f4f6; color: black; cursor:pointer; text-align: left;
+            transition: all 0.2s; font-size: 13.5px;
+        }
+        .chat-btn:hover{ background: #e5e7eb; }
+        .chat-btn.active{ background: var(--primary); color:white; }
+
+        /* Presence Roster */
+        .roster-header { padding: 10px 20px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; font-weight: 600; }
+        #rosterList { list-style: none; padding: 0 20px 20px 20px; overflow-y: auto; flex-grow: 1; }
+        
+        .roster-member {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 14px;
+            position: relative;
+        }
+
+        /* Tooltip Style - Perfectly Positioned */
+        .bio-tooltip {
+            position: absolute;
+            left: 50px;
+            bottom: 100%;
+            background: var(--primary);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            width: max-content;
+            max-width: 180px;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+            z-index: 10000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            pointer-events: none;
+            margin-bottom: 5px;
+        }
+
+        .roster-member:hover .bio-tooltip, 
+        .message-avatar-container:hover .bio-tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .roster-status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background-color: #fca5a5; }
+        .roster-status-dot.online { background-color: var(--online); }
+        .roster-status-dot.typing { background-color: var(--typing); }
+
+        /* Main Chat Area */
+        .main-area{flex:1}
+        .chat-container{
+            margin:20px; background:#fff; border-radius:16px;
+            display:flex; flex-direction:column; height:calc(100vh - 40px); overflow: hidden;
+        }
+        .chat-header{ padding:15px 20px; border-bottom:1px solid #e5e7eb; display:flex; gap:15px; align-items: center; }
+        #roomDesc { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+        .user-avatar{
+            width:40px; height:40px; border-radius:50%; background: var(--primary); color:white;
+            display:flex; align-items:center; justify-content:center; font-weight:600; flex-shrink: 0;
+        }
+
+        .messages-area{ flex:1; padding:20px; overflow-y:auto; background: var(--chat-bg); }
+        
+        /* Message Styles */
+        .message{margin-bottom:15px; display:flex; gap: 10px; align-items: flex-start;}
+        .message.sent{flex-direction: row-reverse;}
+
+        .message-avatar-container { position: relative; cursor: pointer; }
+        .msg-mini-avatar { width: 32px; height: 32px; font-size: 11px; }
+
+        .message-content{
+            max-width:70%; padding:10px 14px; border-radius:14px; background:#e5e7eb;
+            color:black; word-wrap: break-word; font-size: 14px;
+            position: relative;
+        }
+        .message.sent .message-content{ background: var(--primary); color:white; }
+        .message-time{ font-size:10px; opacity:.7; margin-top:4px; text-align: right; }
+
+        .chat-img {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 8px;
+            margin-top: 5px;
+            display: block;
+            cursor: zoom-in;
+        }
+
+        .input-area{ padding:20px; border-top:1px solid #e5e7eb; }
+        .input-wrapper{ display:flex; gap:10px; background:#f3f4f6; padding:10px 16px; border-radius:24px; align-items: center;}
+        .message-input{ flex:1; border:none; outline:none; background:transparent; font-size: 15px; }
+        
+        .icon-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: #6b7280; padding: 5px; }
+        .send-btn { background: var(--primary); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; }
+
+        #joinOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.8); display:flex; align-items:center; justify-content:center; z-index:100000; }
+
+        /* NEW: Floating Ask Assistant Button Styles */
+        .assistant-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 30px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 13px;
+            z-index: 100;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .assistant-btn:hover {
+            transform: scale(1.05);
+            background: #2d3748;
+        }
+        .assistant-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+    </style>
+</head>
+<body>
+
+<div id="joinOverlay">
+  <div id="joinBox" style="background:white; padding:30px; border-radius:12px; width:350px; text-align: center;">
+    <h3 style="margin-bottom:15px">College Chat Hub</h3>
+    <input id="name" placeholder="Enter Full Name" style="width:100%;padding:12px;margin-bottom:15px; border: 1px solid #ccc; border-radius: 8px;">
+    <button onclick="join()" style="width:100%;padding:12px; background: #1f2937; color:white; border-radius:8px; border:none; cursor:pointer; font-weight:600">Join Community</button>
+  </div>
+</div>
+
+<div class="dashboard-container">
+    <a href="chatbot.html"><button class="assistant-btn">
+        
+        Ask Assistant
+    </button></a>
+
+    <div class="sidebar">
+        <div class="sidebar-header"><h3>College Hub</h3></div>
+        
+        <div class="user-profile-card">
+            <div class="user-avatar" id="myMiniAvatar" style="width:35px; height:35px; font-size:12px;">?</div>
+            <div class="profile-info">
+                <div class="profile-name" id="myDisplayName">User</div>
+                <div id="bioContainer"><span class="profile-bio-text" id="myBio" onclick="editBio()">Click to set bio...</span></div>
+            </div>
+        </div>
+
+        <div class="chat-buttons">
+            <button class="chat-btn active" data-channel="college-events" onclick="switchChannel(this)">🎉 College Events</button>
+            <button class="chat-btn" data-channel="technical-discussions" onclick="switchChannel(this)">💻 Technical Group</button>
+            <button class="chat-btn" data-channel="academics-exams" onclick="switchChannel(this)">📚 Academics & Exams</button>
+            <button class="chat-btn" data-channel="placements" onclick="switchChannel(this)">💼 Placements</button>
+            <button class="chat-btn" data-channel="random-chill" onclick="switchChannel(this)">💬 Random Chill</button>
+        </div>
+
+        <div class="roster-header"><span id="userCount">0</span> Online Now</div>
+        <ul id="rosterList"></ul>
+    </div>
+
+    <div class="main-area">
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="user-avatar" id="roomAvatar">CE</div>
+                <div>
+                    <div id="roomName" style="font-weight: 600;">College Events</div>
+                    <div id="roomDesc">Updates about fests and events.</div>
+                    <div class="user-status" style="font-size:11px; color:var(--online); font-weight: 600;">Active</div>
+                </div>
+            </div>
+
+            <div class="messages-area" id="messagesArea"></div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImage(this)">
+                    <button class="icon-btn" onclick="document.getElementById('imgUpload').click()">📎</button>
+                    
+                    <input id="messageInput" class="message-input" placeholder="Type a message..." oninput="handleTyping()" onkeypress="if(event.key==='Enter')sendMessage()">
+                    <button class="send-btn" onclick="sendMessage()">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let ably = null, currentChannel = null, username = null, typingTimeout = null;
+let currentRoomName = "College Events", currentChannelName = "college-events";
+let presenceRoster = {}, userBio = "Student | College Member";
+
+const roomDetails = {
+    'college-events': "Stay updated with cultural fests, workshops, and sports meets.",
+    'technical-discussions': "Share coding tips, bugs, and latest technology trends.",
+    'academics-exams': "Find study materials, notes, and exam schedules.",
+    'placements': "Job alerts, referrals, and interview experiences.",
+    'random-chill': "Memes, music, and off-topic conversations."
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const savedName = localStorage.getItem('chatUsername');
+    const savedBio = localStorage.getItem('chatBio');
+    if(savedBio) { userBio = savedBio; document.getElementById('myBio').innerText = userBio; }
+    if(savedName) { document.getElementById('name').value = savedName; join(); }
+});
+
+function join() {
+    username = document.getElementById("name").value.trim();
+    if (!username) return alert("Please enter your name!");
+    
+    localStorage.setItem('chatUsername', username);
+    document.getElementById("joinOverlay").style.display = "none";
+    document.getElementById("myDisplayName").innerText = username;
+    document.getElementById("myMiniAvatar").innerText = username.substring(0,2).toUpperCase();
+    
+    if (!ably) {
+        ably = new Ably.Realtime({ authUrl: `/token?clientId=${username}` });
+        ably.connection.on("connected", () => switchChannelByName(currentChannelName, currentRoomName));
+    }
+}
+
+function switchChannel(button) {
+    const newChan = button.getAttribute('data-channel');
+    const newRoom = button.innerText.split(' ').slice(1).join(' ');
+    if (newChan !== currentChannelName) {
+        document.querySelectorAll('.chat-btn').forEach(b => b.classList.remove('active'));
+        button.classList.add('active');
+        document.getElementById("roomDesc").innerText = roomDetails[newChan] || "Community Chat";
+        switchChannelByName(newChan, newRoom);
+    }
+}
+
+function switchChannelByName(chan, room) {
+    if (currentChannel) { currentChannel.presence.leave(); currentChannel.unsubscribe(); currentChannel.detach(); }
+    currentChannelName = chan;
+    currentRoomName = room;
+    document.getElementById("messagesArea").innerHTML = "";
+    document.getElementById("roomName").innerText = room;
+    document.getElementById("roomAvatar").innerText = chan.substring(0,2).toUpperCase();
+    
+    currentChannel = ably.channels.get(chan);
+    currentChannel.presence.enter({ status: 'online', bio: userBio });
+
+    currentChannel.history({ limit: 50 }, (err, resultPage) => {
+        if (!err) resultPage.items.reverse().forEach(msg => renderMessage(msg.clientId, msg.data, msg.clientId === username, new Date(msg.timestamp)));
+    });
+
+    currentChannel.subscribe("msg", msg => { if(msg.clientId !== username) renderMessage(msg.clientId, msg.data, false, new Date(msg.timestamp)); });
+    
+    currentChannel.presence.subscribe(msg => {
+        if (msg.clientId === username) return;
+        if (msg.action === 'leave') delete presenceRoster[msg.clientId];
+        else presenceRoster[msg.clientId] = msg.data;
+        updateRoster();
+    });
+
+    currentChannel.presence.get((err, res) => {
+        if(!err) { res.forEach(m => { if(m.clientId !== username) presenceRoster[m.clientId] = m.data; }); updateRoster(); }
+    });
+
+    currentChannel.subscribe("typing:start", msg => {
+        if(msg.clientId !== username && presenceRoster[msg.clientId]) {
+            presenceRoster[msg.clientId].status = 'typing'; updateRoster(); setStatus(`${msg.clientId} is typing...`);
+        }
+    });
+
+    currentChannel.subscribe("typing:stop", msg => {
+        if(msg.clientId !== username && presenceRoster[msg.clientId]) {
+            presenceRoster[msg.clientId].status = 'online'; updateRoster(); setStatus("Active");
+        }
+    });
+}
+
+function sendMessage() {
+    const input = document.getElementById("messageInput");
+    const text = input.value.trim();
+    if(!text) return;
+    const data = { type: 'text', content: text };
+    currentChannel.publish("msg", data);
+    renderMessage(username, data, true);
+    input.value = "";
+    stopTyping();
+}
+
+function handleImage(input) {
+    const file = input.files[0];
+    if(!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxW = 400;
+            const scale = maxW / img.width;
+            canvas.width = maxW;
+            canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const compressedData = canvas.toDataURL('image/jpeg', 0.6);
+            const data = { type: 'image', content: compressedData };
+            currentChannel.publish("msg", data);
+            renderMessage(username, data, true);
+        }
+    };
+    reader.readAsDataURL(file);
+    input.value = "";
+}
+
+function renderMessage(sender, data, isSelf, date = new Date()) {
+    const area = document.getElementById("messagesArea");
+    const div = document.createElement("div");
+    div.className = `message ${isSelf ? "sent" : "received"}`;
+    
+    const senderBio = isSelf ? userBio : (presenceRoster[sender]?.bio || "Student at College");
+    const content = data.type === 'text' 
+        ? `<div>${isSelf ? '' : `<b>${sender}:</b> `}${data.content}</div>`
+        : `<img src="${data.content}" class="chat-img" onclick="window.open(this.src)">`;
+
+    div.innerHTML = `
+        <div class="message-avatar-container">
+            <div class="user-avatar msg-mini-avatar">${sender.substring(0,2).toUpperCase()}</div>
+            <div class="bio-tooltip">${senderBio}</div>
+        </div>
+        <div class="message-content">
+            ${content}
+            <div class="message-time">${date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+        </div>`;
+    
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+}
+
+function handleTyping() {
+    currentChannel.publish("typing:start", "");
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(stopTyping, 1500);
+}
+function stopTyping() { if(currentChannel) currentChannel.publish("typing:stop", ""); }
+
+function editBio() {
+    const current = document.getElementById('myBio').innerText;
+    document.getElementById('bioContainer').innerHTML = `<input type="text" id="bioInput" class="bio-edit-input" value="${current}" onblur="saveBio()" onkeypress="if(event.key==='Enter')saveBio()">`;
+    document.getElementById('bioInput').focus();
+}
+function saveBio() {
+    const input = document.getElementById('bioInput');
+    if(!input) return;
+    userBio = input.value.trim() || "Student";
+    localStorage.setItem('chatBio', userBio);
+    document.getElementById('bioContainer').innerHTML = `<span class="profile-bio-text" id="myBio" onclick="editBio()">${userBio}</span>`;
+    if(currentChannel) currentChannel.presence.update({ status: 'online', bio: userBio });
+}
+
+function updateRoster() {
+    const list = document.getElementById("rosterList");
+    list.innerHTML = "";
+    const names = Object.keys(presenceRoster).sort();
+    document.getElementById("userCount").innerText = names.length + 1;
+    list.appendChild(createMemberElem(username + " (You)", 'online', userBio, true));
+    names.forEach(n => list.appendChild(createMemberElem(n, presenceRoster[n].status, presenceRoster[n].bio, false)));
+}
+function renderMessage(sender, data, isSelf, date = new Date()) {
+    // 🛑 FIX: Agar data khali hai ya content nahi hai, toh print hi mat karo
+    if (!data || !data.content) {
+        return; 
+    }
+
+    const area = document.getElementById("messagesArea");
+    const div = document.createElement("div");
+    div.className = `message ${isSelf ? "sent" : "received"}`;
+    
+    const senderBio = isSelf ? userBio : (presenceRoster[sender]?.bio || "Student at College");
+    
+    let content = "";
+    
+    // Check 1: Agar Text hai
+    if (data.type === 'text') {
+        content = `<div>${isSelf ? '' : `<b>${sender}:</b> `}${data.content}</div>`;
+    } 
+    // Check 2: Agar Image hai (Sirf tabhi dikhao jab type 'image' ho)
+    else if (data.type === 'image') {
+        content = `<img src="${data.content}" class="chat-img" 
+                   onerror="this.style.display='none'" 
+                   onclick="window.open(this.src)">`;
+    } 
+    // Agar na text hai na image (garbage data), toh function yahin rok do
+    else {
+        return;
+    }
+
+    div.innerHTML = `
+        <div class="message-avatar-container">
+            <div class="user-avatar msg-mini-avatar">${sender.substring(0,2).toUpperCase()}</div>
+            <div class="bio-tooltip">${senderBio}</div>
+        </div>
+        <div class="message-content">
+            ${content}
+            <div class="message-time">${date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+        </div>`;
+    
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+}
+function createMemberElem(name, status, bio, isSelf) {
+    const li = document.createElement("li");
+    li.className = "roster-member";
+    li.innerHTML = `<span class="roster-status-dot ${status}"></span>
+                    <span style="${isSelf?'font-weight:600':''}">${name}</span>
+                    <div class="bio-tooltip">${bio || "Student at College"}</div>`;
+    return li;
+}
+function setStatus(t) { document.querySelector(".user-status").innerText = t; }
+</script>
+</body>
+</html>

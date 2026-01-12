@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <style>
+        body {
+            background: linear-gradient(135deg, #4a4a4a 0%, #e0e0e0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            position: relative;
+        }
+
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 
+                        0 10px 30px rgba(0, 0, 0, 0.3),
+                        0 0 0 1px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.6), 
+                        0 15px 40px rgba(0, 0, 0, 0.4),
+                        0 0 0 1px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-weight: 600;
+            font-size: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background-color: #f8f9fa;
+        }
+
+        input[type="email"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #4a5568;
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(74, 85, 104, 0.1);
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #2c3e50 0%, #4a5568 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button[type="submit"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        button[type="submit"]:active {
+            transform: translateY(0);
+        }
+
+        .divider {
+            text-align: center;
+            margin: 25px 0;
+            position: relative;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 100%;
+            height: 1px;
+            background: #e0e0e0;
+        }
+
+        .divider span {
+            background: white;
+            padding: 0 10px;
+            position: relative;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .create-account {
+            text-align: center;
+        }
+
+        .create-account a {
+            color: #4a5568;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .create-account a:hover {
+            color: #2c3e50;
+            text-decoration: underline;
+        }
+
+        .input-icon {
+            position: relative;
+        }
+
+        .input-icon::before {
+            content: '📧';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+        }
+
+        .input-icon.password::before {
+            content: '🔒';
+        }
+
+        .input-icon input {
+            padding-left: 45px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Welcome Back</h2>
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <div class="input-icon">
+                    <input type="email" name="email" placeholder="Email" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="input-icon password">
+                    <input type="password" name="password" placeholder="Password" required>
+                </div>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <div class="divider">
+            <span>or</span>
+        </div>
+        <div class="create-account">
+            <a href="/create">Create New Account</a>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+</body>
+</html>
