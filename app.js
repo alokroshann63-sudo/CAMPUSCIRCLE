@@ -7,17 +7,19 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const Ably = require("ably");
 const bcrypt = require('bcrypt');
-const mongoose = require("mongoose");
+const { dbConnect } = require('./lib/mongoose');
+const userModel = require('./user');
 
 const app = express();
 
-// 2. Database Connection (Ab .env se lega)
-// Agar .env mein nahi mila, toh backup ke liye hardcoded URL use karega
-const mongoURI = process.env.MONGO_URI || "mongodb://localhost:27017/user";
+app.set('view engine', 'ejs');
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(cookieParser());
 
-mongoose.connect(mongoURI)
-    .then(() => console.log("✅ MongoDB Connected"))
-    .catch(err => console.error("❌ MongoDB Error:", err));
+// 2. JWT Secret (.env se)
+const JWT_SECRET = process.env.JWT_SECRET || "fallbackSecretKey";
 
 // 3. Ably Setup (Ab .env se lega)
 const ablyApiKey = process.env.ABLY_API_KEY;
@@ -26,15 +28,6 @@ if (!ablyApiKey) {
     process.exit(1);
 }
 const ably = new Ably.Rest(ablyApiKey);
-
-app.set('view engine', 'ejs');
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(cookieParser());
-
-// 4. JWT Secret (.env se)
-const JWT_SECRET = process.env.JWT_SECRET || "fallbackSecretKey";
 
 /* ================= ROUTES ================= */
 
@@ -48,19 +41,27 @@ app.get('/create', (req, res) => {
 });
 
 app.post('/create', async (req, res) => {
-    let { username, email, password, age } = req.body;
-    if (!username || !email || !password || !age) return res.redirect("/?error=emptyfields");
+    try {
+        // Connect to database before querying
+        await dbConnect();
+        
+        let { username, email, password, age } = req.body;
+        if (!username || !email || !password || !age) return res.redirect("/?error=emptyfields");
 
-    age = Number(age);
-    if (isNaN(age) || age < 18 || age > 100) return res.redirect("/?error=invalidage");
+        age = Number(age);
+        if (isNaN(age) || age < 18 || age > 100) return res.redirect("/?error=invalidage");
 
-    let exists = await userModel.findOne({ email });
-    if (exists) return res.redirect("/?error=emailexists");
+        let exists = await userModel.findOne({ email });
+        if (exists) return res.redirect("/?error=emailexists");
 
-    const hash = await bcrypt.hash(password, 10);
-    await userModel.create({ username, email, password: hash, age });
+        const hash = await bcrypt.hash(password, 10);
+        await userModel.create({ username, email, password: hash, age });
 
-    res.redirect("/login");
+        res.redirect("/login");
+    } catch (error) {
+        console.error("❌ Signup Error:", process.env.NODE_ENV === 'production' ? error.message : error);
+        res.redirect("/?error=servererror");
+    }
 });
 
 app.get("/login", (req, res) => {
@@ -68,20 +69,28 @@ app.get("/login", (req, res) => {
 });
 
 app.post("/login", async (req, res) => {
-    let { email, password } = req.body;
-    if (!email || !password) return res.redirect("/login?error=emptyfields");
+    try {
+        // Connect to database before querying
+        await dbConnect();
+        
+        let { email, password } = req.body;
+        if (!email || !password) return res.redirect("/login?error=emptyfields");
 
-    let user = await userModel.findOne({ email });
-    if (!user) return res.redirect("/?error=notfound");
+        let user = await userModel.findOne({ email });
+        if (!user) return res.redirect("/?error=notfound");
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.redirect("/login?error=wrongpassword");
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.redirect("/login?error=wrongpassword");
 
-    // Yahan humne process.env.JWT_SECRET use kiya hai
-    let token = jwt.sign({ email: user.email }, JWT_SECRET);
-    
-    res.cookie("token", token);
-    res.redirect("/chatting"); 
+        // Yahan humne process.env.JWT_SECRET use kiya hai
+        let token = jwt.sign({ email: user.email }, JWT_SECRET);
+        
+        res.cookie("token", token);
+        res.redirect("/chatting");
+    } catch (error) {
+        console.error("❌ Login Error:", process.env.NODE_ENV === 'production' ? error.message : error);
+        res.redirect("/login?error=servererror");
+    }
 });
 
 app.get("/logout", (req, res) => {
@@ -140,15 +149,6 @@ app.get('/token', async (req, res) => {
         res.status(500).send("Error generating token: " + err.message);
     }
 });
-
-/* --- Database Model --- */
-const userSchema = mongoose.Schema({
-    username: String,
-    email: String,
-    password: String,
-    age: Number
-});
-const userModel = mongoose.model("user", userSchema);
 
 /* --- Start Server --- */
 app.listen(3000, () => {
